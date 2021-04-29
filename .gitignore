@@ -1,3 +1,4 @@
 logs/*
 sensors/__pycache__/*
 bin/__pycache__/*
+data/*
