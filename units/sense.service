@@ -1,0 +1,11 @@
+[Unit]
+Description=Weather station sensors reader 
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=python /home/pi/meteo/bin/sense.py /home/pi/meteo/config/sense.json
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
