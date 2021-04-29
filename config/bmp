@@ -1,0 +1,6 @@
+address=118
+mode=normal
+iir=16
+osp=16
+ost=2
+sp=250

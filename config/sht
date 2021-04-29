@@ -1,0 +1,3 @@
+data_pin=17
+sck_pin=27
+log=/home/pi/meteo-new/logs

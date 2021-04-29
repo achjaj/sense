@@ -1,0 +1,8 @@
+{
+    "root": "/home/pi/meteo-new",
+    "sensors": "sensors",
+    "period": 1,
+    "log": true,
+    "logDir": "logs/sense/",
+    "dataDir": "data"
+}
