@@ -1,0 +1,11 @@
+[Unit]
+Description=Weather station files server 
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=python -m http.server 80 --directory /home/pi/meteo
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
