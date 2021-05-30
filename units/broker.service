@@ -1,0 +1,11 @@
+[Unit]
+Description=MQTT broker
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=mqttools broker --port 1111
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
