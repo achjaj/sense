@@ -7,6 +7,8 @@ import os
 from datetime import datetime as dt
 from time import sleep
 from pykson import *
+import mqttools
+import asyncio
 
 
 class Settings(JsonObject):
@@ -16,6 +18,7 @@ class Settings(JsonObject):
     log = BooleanField()
     logDir = StringField()
     datDir = StringField()
+    mqtt= StringField()
 
 
 class Quantity:
@@ -55,7 +58,8 @@ class Application:
             "sensors": str(root.joinpath("modules")),
             "period": 1000, # milliseconds
             "log": True,
-            "logDir": "logs"
+            "logDir": "logs",
+            "mqtt": "localhost:1111"
         }
 
     def load_settings(self, path):
@@ -101,10 +105,12 @@ class Application:
                     self.sensors_list[-1].initialize(self.root)
                 except Exception as e:
                     self.log("Initialization failed: {0}".format(e))
-                    self.log("Removing sensor '{0}'".format(name))
-                    self.sensors_list.remove(self.sensors_list[-1])
+                    self.remove_sensor(self.sensors_list[-1], False)
                 
         self.validate()
+
+    def to_bytes(self, o):
+        return bytes(str(o).replace("'", '"'), "utf-8")
 
     def __init__(self, args):
         if len(args) > 1:
@@ -122,11 +128,25 @@ class Application:
         self.logFile = open(str(self.logDir.joinpath("sense.log")), "w")
         self.dataDir = self.root.joinpath(settings["dataDir"])
 
+        tmp = settings["mqtt"].split(":")
+        self.mqttIP = tmp[0]
+        self.mqttPort = int(tmp[1])
+
         self.log("Settings loaded")
         self.sensors_list = list()
         self.mkpaths()
         self.load_sensors()
 
+    def remove_sensor(self, sensor, publish):
+        self.log("Removing sensor '{0}'".format(sensor.name))
+        self.sensors_list.remove(sensor)
+        if publish:
+            self.publish_sensors_list()
+
+    def publish_sensors_list(self):
+        names = list(map(lambda s: s.name, self.sensors_list))
+        self.client.publish("/meteo/sensors/list", self.to_bytes(names)) 
+        
     def get_sensor_data(self, sensor):
         readings = list()
         self.log("Reading sensor: '{0}'".format(sensor.name))
@@ -142,29 +162,42 @@ class Application:
                 readings.append(reading)
             except Exception as e:
                 self.log("Reading error: {0}".format(e))
-                self.log("Removing sensor '{0}'".format(sensor.name))
-                self.sensors_list.remove(sensor)
+                self.remove_sensor(sensor, True)
                 break
+                
 
         return {"name": sensor.name, "quantities": readings}
 
-    def run(self):
-        while True:
+    async def run(self):
+        self.log("Starting MQTT publisher")
+        self.client = mqttools.Client(self.mqttIP, self.mqttPort)
+        try:
+            await self.client.start()
+        except Exception as e:
+            self.log("Cannot start MQTT: '{0}'".format(e))
+            exit(1)
+        self.log("MQTT OK")
+        self.publish_sensors_list()
+        while True: 
             sensors_file = self.dataDir.joinpath("sensors.json")
 
             quantities = list()
             if len(self.sensors_list) == 0:
                 self.log("No sensors")
             else:
-                for sensor in self.sensors_list:
+                for sensor in self.sensors_list:  
                     data = self.get_sensor_data(sensor)
+                    self.client.publish("/meteo/sensors/{0}".format(sensor.name), self.to_bytes(data)) 
     
                     for q in data["quantities"]:
                         quantities.append(q)
  
                 self.log("Writing data")
+                out = json.dumps(quantities, indent=4)
                 with open(sensors_file, "w") as f:
-                    f.write(json.dumps(quantities, indent=4))
+                    f.write(out)
+
+                self.client.publish("/meteo/quantities", self.to_bytes(out))
 
             sleep(self.period)
 
@@ -173,4 +206,5 @@ if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
     # execute only if run as a script
-    Application(sys.argv).run()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(Application(sys.argv).run())

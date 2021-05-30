@@ -4,5 +4,6 @@
     "period": 1,
     "log": true,
     "logDir": "logs",
-    "dataDir": "data"
+    "dataDir": "data",
+    "mqtt": "localhost:1111"
 }
