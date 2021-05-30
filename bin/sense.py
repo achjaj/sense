@@ -12,7 +12,9 @@ from pykson import *
 class Settings(JsonObject):
     root = StringField()
     sensors = StringField()
-    period = IntegerField() 
+    period = IntegerField()
+    log = BooleanField()
+    logDir = StringField()
     datDir = StringField()
 
 
@@ -33,7 +35,8 @@ class Quantity:
 
 class Application:
     def mkpaths(self):
-        self.root.mkdir(parents=True, exist_ok=True) 
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.logDir.mkdir(parents=True, exist_ok=True)
         self.dataDir.mkdir(parents=True, exist_ok=True)
         #self.root.joinpath("sensors").mkdir(parents=True, exist_ok=True)
         #self.root.joinpath("quantities").mkdir(parents=True, exist_ok=True)
@@ -95,7 +98,9 @@ class Application:
         global root
         root = self.root
         self.sources = self.root.joinpath(settings["sensors"])
-        self.period = settings["period"] 
+        self.period = settings["period"]
+        self.log = settings["log"]
+        self.logDir = self.root.joinpath(settings["logDir"])
         self.dataDir = self.root.joinpath(settings["dataDir"])
 
         self.sensors_list = list()
@@ -117,21 +122,24 @@ class Application:
         return {"name": sensor.name, "quantities": readings}
 
     def run(self):
-        while True: 
+        while True:
+            log_file = self.logDir.joinpath(str(date.today()) + ".json")
             sensors_file = self.dataDir.joinpath("sensors.json")
 
             quantities = list()
-            
+            sensors = list()
             for sensor in self.sensors_list:
                 data = self.get_sensor_data(sensor)
-                
+                sensors.append(data)
 
                 for q in data["quantities"]:
                     quantities.append(q)
 
-            
-            with open(sensors_file, "w") as f:
+            with open(log_file, "w") as f:
                 f.write(json.dumps(quantities, indent=4))
+
+            with open(sensors_file, "w") as f:
+                f.write(json.dumps(sensors, indent=4))
 
             sleep(self.period)
 
